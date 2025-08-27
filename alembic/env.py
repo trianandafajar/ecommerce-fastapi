@@ -3,16 +3,13 @@ from sqlalchemy import engine_from_config, pool
 from alembic import context
 
 from app.utils.database import Base
-from app.models import product  # pastikan semua model di-import agar terdaftar
+from app.models import product, user 
 
-# ini config dari alembic.ini
 config = context.config
 
-# logging
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# target metadata untuk autogenerate
 target_metadata = Base.metadata
 
 

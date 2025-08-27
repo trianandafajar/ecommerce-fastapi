@@ -10,7 +10,7 @@ alembic==1.13.1
 # Database Driver
 psycopg2-binary==2.9.9   # PostgreSQL
 mysqlclient==2.2.4       # MySQL
-aiosqlite==0.20.0          # SQLite async
+aiosqlite==0.20.0        # SQLite async
 
 # Security
 passlib[bcrypt]==1.7.4
