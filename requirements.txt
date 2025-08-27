@@ -1,0 +1,24 @@
+# Core
+fastapi[standard]==0.113.0
+pydantic==2.8.0
+uvicorn[standard]==0.30.1
+
+# Database
+SQLAlchemy==2.0.31
+alembic==1.13.1
+
+# Database Driver
+psycopg2-binary==2.9.9   # PostgreSQL
+mysqlclient==2.2.4       # MySQL
+aiosqlite==0.20.0          # SQLite async
+
+# Security
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0
+
+# Email / Utils
+email-validator==2.2.0
+python-multipart==0.0.9
+
+# Optional dev tools
+python-dotenv==1.0.1
