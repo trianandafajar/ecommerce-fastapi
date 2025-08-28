@@ -1,11 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+# app/routers/auth.py
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
+from fastapi.encoders import jsonable_encoder
+
 from app.utils.database import SessionLocal
 from app.models import User as UserModel
 from app.schemas import User, UserCreate
 from app.utils.auth import hash_password, verify_password, create_access_token
+from app.schemas.response import SuccessResponse, ErrorResponse
+from app.utils.response import success_response, error_response
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
+
 
 def get_db():
     db = SessionLocal()
@@ -14,30 +20,73 @@ def get_db():
     finally:
         db.close()
 
-# register user
-@router.post("/register", response_model=User)
-def register(user: UserCreate, db: Session = Depends(get_db)):
+
+# REGISTER
+@router.post(
+    "/register",
+    response_model=SuccessResponse[User],
+    responses={400: {"model": ErrorResponse}},
+    status_code=status.HTTP_201_CREATED,
+)
+def register(request: Request, user: UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(UserModel).filter(UserModel.email == user.email).first()
     if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
+        return error_response(
+            message="Email already registered",
+            code=400,
+            metadata={"request_id": getattr(request.state, "request_id", None)},
+        )
 
-    new_user = UserModel(
-        name=user.name,
-        email=user.email,
-        phone=user.phone,
-        password=hash_password(user.password)
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    return new_user
+    try:
+        new_user = UserModel(
+            name=user.name,
+            email=user.email,
+            phone=user.phone,
+            password=hash_password(user.password),
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
 
-# login
-@router.post("/login")
-def login(email: str, password: str, db: Session = Depends(get_db)):
+        payload = {
+            "code": 201,
+            "status": "success",
+            "message": "User registered successfully",
+            "data": User.model_validate(new_user).model_dump(),
+            "metadata": {"request_id": getattr(request.state, "request_id", None)},
+        }
+        return jsonable_encoder(payload)
+    except Exception as e:
+        return error_response(
+            message="Failed to register user",
+            code=500,
+            details=str(e),
+            metadata={"request_id": getattr(request.state, "request_id", None)},
+        )
+
+
+# LOGIN
+@router.post(
+    "/login",
+    response_model=SuccessResponse[dict],
+    responses={401: {"model": ErrorResponse}},
+)
+def login(request: Request, email: str, password: str, db: Session = Depends(get_db)):
     user = db.query(UserModel).filter(UserModel.email == email).first()
     if not user or not verify_password(password, user.password):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        return error_response(
+            message="Invalid credentials",
+            code=401,
+            metadata={"request_id": getattr(request.state, "request_id", None)},
+        )
 
     token = create_access_token({"sub": str(user.id)})
-    return {"access_token": token, "token_type": "bearer"}
+
+    payload = {
+        "code": 200,
+        "status": "success",
+        "message": "Login successful",
+        "data": {"access_token": token, "token_type": "bearer"},
+        "metadata": {"request_id": getattr(request.state, "request_id", None)},
+    }
+    return jsonable_encoder(payload)
