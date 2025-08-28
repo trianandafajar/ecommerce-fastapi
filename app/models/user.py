@@ -1,6 +1,7 @@
 import uuid
 from sqlalchemy import Column, String, Text, DateTime
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.utils.database import Base
 
 
@@ -14,3 +15,8 @@ class User(Base):
     phone = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    carts = relationship("Cart", back_populates="user")
+
+    def __repr__(self):
+        return f"<User id={self.id} name={self.name} email={self.email}>"
