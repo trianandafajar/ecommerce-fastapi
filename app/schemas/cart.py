@@ -5,7 +5,7 @@ from typing import Optional, List
 
 # ---------------- CART ITEM ----------------
 class CartItemBase(BaseModel):
-    product_id: str
+    product_id: uuid.UUID
     quantity: int
 
 class CartItemCreate(CartItemBase):
@@ -23,7 +23,7 @@ class CartItem(CartItemBase):
 
 # ---------------- CART ----------------
 class CartBase(BaseModel):
-    user_id: Optional[str] = None
+    user_id: uuid.UUID = None
     session_token: Optional[str] = None
 
 class CartCreate(CartBase):

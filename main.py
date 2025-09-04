@@ -2,17 +2,19 @@
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from dotenv import load_dotenv
 import logging
+
+load_dotenv()
 
 from app.middleware.request_id import RequestIDMiddleware
 from app.utils.response import (
-    success_response,
     error_response,
     validation_error_response,
     make_request_id,
 )
 # import routers
-from app.routers import product, auth, cart
+from app.routers import product, auth, cart, order
 
 app = FastAPI(title="E-Commerce API")
 
@@ -22,12 +24,13 @@ api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth.router)
 api_router.include_router(product.router)
 api_router.include_router(cart.router)
+api_router.include_router(order.router)
 app.include_router(api_router)
 
 # root
 @app.get("/")
 def root():
-    return {"message": "FastAPI E-COMMERCE started successfully nih 🚀"}
+    return {"message": "FastAPI E-COMMERCE started successfully 🚀"}
 
 # add middleware
 app.add_middleware(RequestIDMiddleware)

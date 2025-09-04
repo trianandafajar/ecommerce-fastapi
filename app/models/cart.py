@@ -8,9 +8,9 @@ from app.utils.database import Base
 class Cart(Base):
     __tablename__ = "carts"
     
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    user_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)
-    session_token = Column(String, nullable=True, unique=True, index=True)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
+    user_id = Column(String(225), ForeignKey("users.id"), nullable=True, index=True)
+    session_token = Column(String(225), nullable=True, unique=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="carts")
@@ -23,9 +23,9 @@ class Cart(Base):
 class CartItem(Base):
     __tablename__ = "cart_items"
     
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    cart_id = Column(String, ForeignKey("carts.id"), nullable=False, index=True)
-    product_id = Column(String, ForeignKey("products.id"), nullable=False, index=True)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
+    cart_id = Column(String(36), ForeignKey("carts.id"), nullable=False, index=True)
+    product_id = Column(String(36), ForeignKey("products.id"), nullable=False, index=True)
     quantity = Column(Integer, nullable=False, default=1)
 
 

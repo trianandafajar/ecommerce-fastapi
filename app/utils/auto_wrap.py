@@ -10,10 +10,6 @@ def _is_wrapped_payload(obj: Any) -> bool:
     return isinstance(obj, dict) and "code" in obj and "status" in obj
 
 def auto_wrap_response(message: Optional[str] = None, code: int = 200):
-    """
-    Decorator untuk otomatis bungkus return value jadi success_response,
-    kecuali jika fungsi sudah mengembalikan JSONResponse atau payload sudah wrapper.
-    """
     def decorator(func: Callable):
         if inspect.iscoroutinefunction(func):
             @wraps(func)
