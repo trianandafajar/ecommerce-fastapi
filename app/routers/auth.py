@@ -2,15 +2,18 @@
 from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
 from fastapi.encoders import jsonable_encoder
+from fastapi.security import OAuth2PasswordBearer
+
 
 from app.utils.database import SessionLocal
 from app.models import User as UserModel
 from app.schemas import User, UserCreate
-from app.utils.auth import hash_password, verify_password, create_access_token
+from app.utils.auth import hash_password, verify_password, create_access_token, get_current_user
 from app.schemas.response import SuccessResponse, ErrorResponse
 from app.utils.response import success_response, error_response
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
 def get_db():
@@ -90,3 +93,41 @@ def login(request: Request, email: str, password: str, db: Session = Depends(get
         "metadata": {"request_id": getattr(request.state, "request_id", None)},
     }
     return jsonable_encoder(payload)
+
+# GET CURRENT USER
+@router.get(
+    "/me",
+    response_model=SuccessResponse[dict],
+    responses={401: {"model": ErrorResponse}},
+)
+def me(request: Request, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    try:
+        user = get_current_user(token, db)
+        if not user:
+            return error_response(
+                message="Unauthorized",
+                code=401,
+                metadata={"request_id": getattr(request.state, "request_id", None)},
+            )
+
+        payload = {
+            "code": 200,
+            "status": "success",
+            "message": "User info retrieved successfully",
+            "data": {
+                "id": str(user.id),
+                "name": user.name,
+                "email": user.email,
+                "phone": user.phone,
+            },
+            "metadata": {"request_id": getattr(request.state, "request_id", None)},
+        }
+        return jsonable_encoder(payload)
+
+    except Exception as e:
+        return error_response(
+            message="Failed to get user info",
+            code=500,
+            details=str(e),
+            metadata={"request_id": getattr(request.state, "request_id", None)},
+        )

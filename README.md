@@ -53,3 +53,12 @@ Jika ada perubahan pada model:
     ```
     alembic downgrade -1
     ```
+
+## doc khusus yang tidak bisa menjalakan ulang
+1.  
+    ```
+    source .venv/Scripts/activate
+    ```
+2.  ```
+    uvicorn main:app --reload
+    ```

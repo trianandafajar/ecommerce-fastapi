@@ -2,6 +2,13 @@ from datetime import datetime, timedelta
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 import os
+from fastapi import Depends
+from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.orm import Session
+from jose import JWTError
+from app.models import User as UserModel
+from app.utils.database import SessionLocal
+from .response import error_response
 
 # config
 SECRET_KEY = os.getenv("AUTH_SECRET_KEY", 'inirahasiatinkatnegara') 
@@ -9,6 +16,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
@@ -28,3 +36,26 @@ def decode_access_token(token: str):
         return payload
     except JWTError:
         return None
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> UserModel | None:
+    """
+    Extract the current user from the Authorization Bearer token.
+    Returns None if token is invalid.
+    """
+    payload = decode_access_token(token)
+    if not payload:
+        return None
+
+    user_id = payload.get("sub")
+    if not user_id:
+        return None
+
+    user = db.query(UserModel).filter(UserModel.id == int(user_id)).first()
+    return user
