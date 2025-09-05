@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
 from typing import List
 from fastapi.encoders import jsonable_encoder
+from fastapi import Query
 
 from app.utils.database import SessionLocal
 from app.models import Product as ProductModel
@@ -29,14 +30,28 @@ def get_db():
     responses={500: {"model": ErrorResponse}},
 )
 def read_products(
-    request: Request, skip: int = 0, limit: int = 10, db: Session = Depends(get_db)
+    request: Request, page: int = Query(1, ge=1), per_page: int = Query(10, ge=1, le=100), db: Session = Depends(get_db)
 ):
     try:
-        products = db.query(ProductModel).offset(skip).limit(limit).all()
+        total = db.query(ProductModel).count()
+        curent_page = page
+        page = (page - 1) * per_page
+        
+        products = db.query(ProductModel).offset(page).limit(per_page).all()
+        total_pages = (total + per_page - 1) // per_page 
         return success_response(
             data=[Product.model_validate(p).model_dump() for p in products],
             message="Products fetched successfully",
-            metadata={"request_id": getattr(request.state, "request_id", None)},
+            metadata={
+                "request_id": getattr(request.state, "request_id", None), 
+                "pagination": {
+                    "page": curent_page,
+                    "per_page": per_page,
+                    "total": total,
+                    "total_pages": total_pages,
+                    "has_next": curent_page < total_pages,
+                },
+            },
         )
     except Exception as e:
         return error_response(

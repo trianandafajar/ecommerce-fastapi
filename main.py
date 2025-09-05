@@ -3,6 +3,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
 import logging
 
 load_dotenv()
@@ -32,8 +33,19 @@ app.include_router(api_router)
 def root():
     return {"message": "FastAPI E-COMMERCE started successfully 🚀"}
 
+origins = [
+    "http://localhost:5173"
+]
+
 # add middleware
 app.add_middleware(RequestIDMiddleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 logger = logging.getLogger("uvicorn.error")
 
