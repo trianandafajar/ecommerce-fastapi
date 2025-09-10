@@ -7,7 +7,7 @@ from alembic import context
 from dotenv import load_dotenv
 
 from app.utils.database import Base
-from app.models import user, cart, product, order
+from app.models import user, cart, product, order, otp
 
 load_dotenv()
 

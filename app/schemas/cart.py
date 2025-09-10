@@ -1,3 +1,4 @@
+# app/schemas/cart.py
 import uuid
 from pydantic import BaseModel
 from datetime import datetime
@@ -23,8 +24,7 @@ class CartItem(CartItemBase):
 
 # ---------------- CART ----------------
 class CartBase(BaseModel):
-    user_id: uuid.UUID = None
-    session_token: Optional[str] = None
+    user_id: Optional[uuid.UUID] = None  # boleh kosong (guest cart)
 
 class CartCreate(CartBase):
     pass
