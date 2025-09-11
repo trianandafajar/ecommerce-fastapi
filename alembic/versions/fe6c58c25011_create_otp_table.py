@@ -3,12 +3,10 @@
 Revision ID: fe6c58c25011
 Revises: 0e304c083049
 Create Date: 2025-09-10 11:37:31.040123
-
 """
 from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import mysql
 from sqlalchemy import inspect
 
 # revision identifiers, used by Alembic.
@@ -19,8 +17,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Drop table otps if exists
-    op.execute("DROP TABLE IF EXISTS otps")
+    # Drop table otps if exists (compatible)
+    if 'otps' in op.get_bind().engine.table_names():
+        op.drop_table('otps')
 
     # Create table otps
     op.create_table(
@@ -29,7 +28,7 @@ def upgrade() -> None:
         sa.Column('user_id', sa.String(length=36), nullable=False),
         sa.Column('code', sa.String(length=6), nullable=False),
         sa.Column('is_used', sa.Boolean(), nullable=True),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=True),
         sa.Column('expires_at', sa.DateTime(timezone=True), nullable=False),
         sa.ForeignKeyConstraint(['user_id'], ['users.id']),
         sa.PrimaryKeyConstraint('id')
@@ -70,7 +69,7 @@ def downgrade() -> None:
     op.alter_column(
         'carts', 'user_id',
         existing_type=sa.String(length=225),
-        type_=mysql.VARCHAR(length=36),
+        type_=sa.String(length=36),
         existing_nullable=True
     )
 
@@ -81,5 +80,6 @@ def downgrade() -> None:
         ondelete='CASCADE'
     )
 
-    # Drop otps table
-    op.drop_table('otps')
+    # Drop otps table safely
+    if 'otps' in op.get_bind().engine.table_names():
+        op.drop_table('otps')
