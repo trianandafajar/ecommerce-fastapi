@@ -2,11 +2,11 @@
 import uuid
 from typing import List
 from fastapi import APIRouter, Depends, Request, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from fastapi.encoders import jsonable_encoder
 
 from app.utils.database import SessionLocal
-from app.utils.auth import get_current_user
+from app.utils.auth import get_current_user_optional, get_current_user
 from app.models.cart import Cart as CartModel, CartItem as CartItemModel
 from app.models.user import User
 from app.schemas.cart import (
@@ -19,7 +19,7 @@ from app.schemas.cart import (
 from app.schemas.response import SuccessResponse, ErrorResponse
 from app.utils.response import success_response, error_response
 
-API_URL = "/api/v1/carts"
+API_URL = "/carts"
 router = APIRouter(prefix=API_URL, tags=["Carts"])
 
 
@@ -68,7 +68,11 @@ def read_carts(
             },
         }
 
-        return success_response("Carts fetched", data=carts, metadata=metadata)
+        return success_response(
+            message="Carts fetched",
+            data=carts,
+            metadata=metadata
+        )
     except Exception as e:
         return error_response(
             message="Failed to fetch carts",
@@ -87,12 +91,13 @@ def read_cart_lookup(
     request: Request,
     session_id: str | None = None,
     db: Session = Depends(get_db),
-    current_user: User | None = Depends(get_current_user),  # optional auth
+    current_user: User | None = Depends(get_current_user_optional),  # optional auth
 ):
     """
     Lookup cart:
     - If authenticated: use current_user.id
-    - Else (guest): use session_id
+      - If cart not exists -> create a new cart tied to the user and return it
+    - Else (guest): require session_id and return the cart for that session (404 if not found)
     """
     if not current_user and not session_id:
         return error_response(
@@ -101,18 +106,31 @@ def read_cart_lookup(
             metadata={"request_id": getattr(request.state, "request_id", None)},
         )
 
-    query = db.query(CartModel)
+    query = db.query(CartModel).options(
+        joinedload(CartModel.items).joinedload(CartItemModel.product)
+    )
+
+    cart = None
+
     if current_user:
         cart = query.filter(CartModel.user_id == str(current_user.id)).first()
+        if not cart:
+            cart = CartModel(user_id=str(current_user.id), session_token=None)
+            db.add(cart)
+            db.commit()
+
+            db.refresh(cart)
+            cart = db.query(CartModel).options(
+                joinedload(CartModel.items).joinedload(CartItemModel.product)
+            ).filter(CartModel.id == cart.id).first()
     else:
         cart = query.filter(CartModel.session_token == session_id).first()
-
-    if not cart:
-        return error_response(
-            message="Cart not found",
-            code=404,
-            metadata={"request_id": getattr(request.state, "request_id", None)},
-        )
+        if not cart:
+            return error_response(
+                message="Cart not found",
+                code=404,
+                metadata={"request_id": getattr(request.state, "request_id", None)},
+            )
 
     return success_response(
         message="Cart fetched",
@@ -120,19 +138,32 @@ def read_cart_lookup(
         metadata={"request_id": getattr(request.state, "request_id", None)},
     )
 
-
 @router.post(
     "/",
     response_model=SuccessResponse[CartSchema],
-    responses={400: {"model": ErrorResponse}},
+    responses={400: {"model": ErrorResponse}, 401: {"model": ErrorResponse}},
     status_code=status.HTTP_201_CREATED,
 )
-def create_cart(request: Request, cart: CartCreateSchema, db: Session = Depends(get_db)):
-    """Create cart (session_token generated automatically)"""
+def create_cart(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),  # ⬅️ user harus login
+):
+    """Create cart (only allowed for authenticated users)"""
     try:
+        existing_cart = db.query(CartModel).filter(
+            CartModel.user_id == str(current_user.id)
+        ).first()
+        if existing_cart:
+            return error_response(
+                message="User already has a cart",
+                code=400,
+                metadata={"request_id": getattr(request.state, "request_id", None)},
+            )
+
         db_cart = CartModel(
-            user_id=str(cart.user_id) if cart.user_id else None,
-            session_token=str(uuid.uuid4()),  # auto-generate
+            user_id=str(current_user.id),
+            session_token=None,
         )
         db.add(db_cart)
         db.commit()
@@ -152,6 +183,7 @@ def create_cart(request: Request, cart: CartCreateSchema, db: Session = Depends(
         )
 
 
+
 @router.get(
     "/{cart_id}",
     response_model=SuccessResponse[CartSchema],
@@ -159,7 +191,9 @@ def create_cart(request: Request, cart: CartCreateSchema, db: Session = Depends(
 )
 def read_cart(request: Request, cart_id: str, db: Session = Depends(get_db)):
     """Get cart detail by ID"""
-    cart = db.query(CartModel).filter(CartModel.id == cart_id).first()
+    cart = db.query(CartModel).options(
+        joinedload(CartModel.items).joinedload(CartItemModel.product)
+    ).filter(CartModel.id == cart_id).first()
     if not cart:
         return error_response(
             message="Cart not found",
@@ -224,7 +258,9 @@ def add_item(request: Request, cart_id: str, item: CartItemCreateSchema, db: Ses
         )
         db.add(db_item)
         db.commit()
+        # refresh and re-query to include product relation
         db.refresh(db_item)
+        db_item = db.query(CartItemModel).options(joinedload(CartItemModel.product)).filter(CartItemModel.id == db_item.id).first()
 
         return success_response(
             message="Item added to cart",
@@ -255,6 +291,7 @@ def update_item(request: Request, cart_id: str, item_id: str, item: CartItemUpda
 
     db.commit()
     db.refresh(db_item)
+    db_item = db.query(CartItemModel).options(joinedload(CartItemModel.product)).filter(CartItemModel.id == db_item.id).first()
 
     return success_response(
         message="Cart item updated",

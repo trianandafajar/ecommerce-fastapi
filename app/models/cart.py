@@ -30,7 +30,7 @@ class CartItem(Base):
 
 
     cart = relationship("Cart", back_populates="items")
-    product = relationship("Product")
+    product = relationship("Product", lazy="joined")
 
     def __repr__(self):
         return f"<CartItem id={self.id} cart_id={self.cart_id} product_id={self.product_id} qty={self.quantity}>"

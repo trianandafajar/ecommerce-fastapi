@@ -3,6 +3,7 @@ import uuid
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional, List
+from app.schemas import Product
 
 # ---------------- CART ITEM ----------------
 class CartItemBase(BaseModel):
@@ -17,6 +18,8 @@ class CartItemUpdate(BaseModel):
 
 class CartItem(CartItemBase):
     id: uuid.UUID
+    cart_id: uuid.UUID
+    product: Product
 
     class Config:
         from_attributes = True
