@@ -17,55 +17,70 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Drop carts foreign key safely
     conn = op.get_bind()
     inspector = inspect(conn)
+
+    # --- Drop old foreign key safely ---
     fk_names = [fk['name'] for fk in inspector.get_foreign_keys('carts')]
     if 'carts_ibfk_1' in fk_names:
         op.drop_constraint('carts_ibfk_1', 'carts', type_='foreignkey')
 
-    # Recreate carts foreign key with safer name
-    op.create_foreign_key(
-        'carts_user_id_fkey',  # nama constraint eksplisit
-        'carts', 'users',
-        ['user_id'], ['id'],
-        ondelete='CASCADE'
-    )
+    # --- Create new foreign key if not exists ---
+    fk_names = [fk['name'] for fk in inspector.get_foreign_keys('carts')]
+    if 'carts_user_id_fkey' not in fk_names:
+        op.create_foreign_key(
+            'carts_user_id_fkey',
+            'carts', 'users',
+            ['user_id'], ['id'],
+            ondelete='CASCADE'
+        )
 
-    # Add new address-related columns
-    op.add_column('orders', sa.Column('first_name', sa.String(length=50), nullable=True))
-    op.add_column('orders', sa.Column('last_name', sa.String(length=50), nullable=True))
-    op.add_column('orders', sa.Column('address', sa.Text(), nullable=False))
-    op.add_column('orders', sa.Column('city', sa.String(length=50), nullable=False))
-    op.add_column('orders', sa.Column('postal_code', sa.String(length=20), nullable=False))
-    op.add_column('orders', sa.Column('phone', sa.String(length=20), nullable=False))
+    # --- Add new columns safely ---
+    existing_cols = [c['name'] for c in inspector.get_columns('orders')]
 
-    # Drop old shipping_address column
-    if 'shipping_address' in [c['name'] for c in inspector.get_columns('orders')]:
+    if 'first_name' not in existing_cols:
+        op.add_column('orders', sa.Column('first_name', sa.String(length=50), nullable=True))
+    if 'last_name' not in existing_cols:
+        op.add_column('orders', sa.Column('last_name', sa.String(length=50), nullable=True))
+    if 'address' not in existing_cols:
+        op.add_column('orders', sa.Column('address', sa.Text(), nullable=False))
+    if 'city' not in existing_cols:
+        op.add_column('orders', sa.Column('city', sa.String(length=50), nullable=False))
+    if 'postal_code' not in existing_cols:
+        op.add_column('orders', sa.Column('postal_code', sa.String(length=20), nullable=False))
+    if 'phone' not in existing_cols:
+        op.add_column('orders', sa.Column('phone', sa.String(length=20), nullable=False))
+
+    # --- Drop old shipping_address column if exists ---
+    if 'shipping_address' in existing_cols:
         op.drop_column('orders', 'shipping_address')
 
 
 def downgrade() -> None:
-    # Re-add shipping_address column safely
     conn = op.get_bind()
     inspector = inspect(conn)
-    if 'shipping_address' not in [c['name'] for c in inspector.get_columns('orders')]:
+
+    # --- Re-add shipping_address safely ---
+    existing_cols = [c['name'] for c in inspector.get_columns('orders')]
+    if 'shipping_address' not in existing_cols:
         op.add_column('orders', sa.Column('shipping_address', sa.Text(), nullable=False))
 
-    # Drop added columns
+    # --- Drop added columns safely ---
     for col in ['phone', 'postal_code', 'city', 'address', 'last_name', 'first_name']:
-        if col in [c['name'] for c in inspector.get_columns('orders')]:
+        if col in existing_cols:
             op.drop_column('orders', col)
 
-    # Drop the foreign key safely
+    # --- Drop new foreign key safely ---
     fk_names = [fk['name'] for fk in inspector.get_foreign_keys('carts')]
     if 'carts_user_id_fkey' in fk_names:
         op.drop_constraint('carts_user_id_fkey', 'carts', type_='foreignkey')
 
-    # Recreate original foreign key
-    op.create_foreign_key(
-        'carts_ibfk_1',
-        'carts', 'users',
-        ['user_id'], ['id'],
-        ondelete='CASCADE'
-    )
+    # --- Recreate original foreign key if not exists ---
+    fk_names = [fk['name'] for fk in inspector.get_foreign_keys('carts')]
+    if 'carts_ibfk_1' not in fk_names:
+        op.create_foreign_key(
+            'carts_ibfk_1',
+            'carts', 'users',
+            ['user_id'], ['id'],
+            ondelete='CASCADE'
+        )
