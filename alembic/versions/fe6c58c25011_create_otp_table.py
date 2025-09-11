@@ -18,7 +18,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # Drop table otps if exists (compatible)
-    if 'otps' in op.get_bind().engine.table_names():
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    if 'otps' in inspector.get_table_names():
         op.drop_table('otps')
 
     # Create table otps
@@ -28,7 +30,8 @@ def upgrade() -> None:
         sa.Column('user_id', sa.String(length=36), nullable=False),
         sa.Column('code', sa.String(length=6), nullable=False),
         sa.Column('is_used', sa.Boolean(), nullable=True),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True),
+                  server_default=sa.text('CURRENT_TIMESTAMP'), nullable=True),
         sa.Column('expires_at', sa.DateTime(timezone=True), nullable=False),
         sa.ForeignKeyConstraint(['user_id'], ['users.id']),
         sa.PrimaryKeyConstraint('id')
@@ -81,5 +84,7 @@ def downgrade() -> None:
     )
 
     # Drop otps table safely
-    if 'otps' in op.get_bind().engine.table_names():
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    if 'otps' in inspector.get_table_names():
         op.drop_table('otps')
