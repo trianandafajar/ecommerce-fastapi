@@ -33,16 +33,20 @@ def create_order(request: Request, order: OrderCreateSchema, db: Session = Depen
         total_amount = sum([item.price * item.quantity for item in order.items])
 
         db_order = OrderModel(
-            user_id=str(order.user_id),
+            user_id=str(order.user_id) if order.user_id else None,
             payment_method=order.payment_method,
-            shipping_address=order.shipping_address,
+            first_name=order.first_name,
+            last_name=order.last_name,
+            address=order.address,
+            city=order.city,
+            postal_code=order.postal_code,
+            phone=order.phone,
             total_amount=total_amount,
         )
         db.add(db_order)
         db.commit()
         db.refresh(db_order)
 
-        # add items
         for item in order.items:
             db_item = OrderItemModel(
                 order_id=str(db_order.id),

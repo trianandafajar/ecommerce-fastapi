@@ -321,3 +321,27 @@ def delete_item(request: Request, cart_id: str, item_id: str, db: Session = Depe
         data={},
         metadata={"request_id": getattr(request.state, "request_id", None)},
     )
+
+@router.delete(
+    "/{cart_id}/items",
+    response_model=SuccessResponse[dict],
+    responses={404: {"model": ErrorResponse}},
+)
+def delete_all_cart_items(cart_id: str, request: Request, db: Session = Depends(get_db)):
+    cart = db.query(CartModel).filter(CartModel.id == cart_id).first()
+    if not cart:
+        return error_response(
+            message="Cart not found",
+            code=404,
+            metadata={"request_id": getattr(request.state, "request_id", None)},
+        )
+
+    # Hapus semua items
+    db.query(CartItemModel).filter(CartItemModel.cart_id == cart_id).delete()
+    db.commit()
+
+    return success_response(
+        data={"deleted_cart_id": cart_id},
+        message="All items deleted successfully",
+        metadata={"request_id": getattr(request.state, "request_id", None)},
+    )

@@ -23,39 +23,97 @@ def get_db():
         db.close()
 
 
-# Get all products
+from sqlalchemy import or_
+
+# Get all products with optional search
 @router.get(
     "/",
     response_model=SuccessResponse[List[Product]],
     responses={500: {"model": ErrorResponse}},
 )
 def read_products(
-    request: Request, page: int = Query(1, ge=1), per_page: int = Query(10, ge=1, le=100), db: Session = Depends(get_db)
+    request: Request,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(10, ge=1, le=100),
+    search: str | None = Query(None, description="Search by name or description"),
+    db: Session = Depends(get_db),
 ):
     try:
-        total = db.query(ProductModel).count()
-        curent_page = page
-        page = (page - 1) * per_page
-        
-        products = db.query(ProductModel).offset(page).limit(per_page).all()
-        total_pages = (total + per_page - 1) // per_page 
+        query = db.query(ProductModel)
+
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(
+                or_(
+                    ProductModel.name.ilike(search_term),
+                    ProductModel.description.ilike(search_term),
+                )
+            )
+
+        total = query.count()
+        current_page = page
+        offset = (page - 1) * per_page
+
+        products = query.offset(offset).limit(per_page).all()
+        total_pages = (total + per_page - 1) // per_page
+
         return success_response(
             data=[Product.model_validate(p).model_dump() for p in products],
             message="Products fetched successfully",
             metadata={
-                "request_id": getattr(request.state, "request_id", None), 
+                "request_id": getattr(request.state, "request_id", None),
                 "pagination": {
-                    "page": curent_page,
+                    "page": current_page,
                     "per_page": per_page,
                     "total": total,
                     "total_pages": total_pages,
-                    "has_next": curent_page < total_pages,
+                    "has_next": current_page < total_pages,
                 },
+                "filters": {"search": search},
             },
         )
     except Exception as e:
         return error_response(
             message="Failed to fetch products",
+            code=500,
+            details=str(e),
+            metadata={"request_id": getattr(request.state, "request_id", None)},
+        )
+
+# Get product suggestions (autocomplete)
+@router.get(
+    "/suggestions",
+    response_model=SuccessResponse[List[str]],
+    responses={500: {"model": ErrorResponse}},
+)
+def product_suggestions(
+    request: Request,
+    q: str = Query(..., min_length=1, description="Search keyword"),
+    limit: int = Query(5, ge=1, le=20),
+    db: Session = Depends(get_db),
+):
+    try:
+        suggestions = (
+            db.query(ProductModel.name)
+            .filter(ProductModel.name.ilike(f"%{q}%"))
+            .order_by(ProductModel.name.asc())
+            .limit(limit)
+            .all()
+        )
+
+        result = [s[0] for s in suggestions]
+
+        return success_response(
+            data=result,
+            message=f"Suggestions for '{q}'",
+            metadata={
+                "request_id": getattr(request.state, "request_id", None),
+                "query": q,
+            },
+        )
+    except Exception as e:
+        return error_response(
+            message="Failed to fetch suggestions",
             code=500,
             details=str(e),
             metadata={"request_id": getattr(request.state, "request_id", None)},

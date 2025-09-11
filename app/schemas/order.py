@@ -6,7 +6,6 @@ from typing import List, Optional
 from decimal import Decimal
 from app.models.order import OrderStatus, PaymentMethod
 
-
 # ---------------- ORDER ITEM ----------------
 class OrderItemBase(BaseModel):
     product_id: uuid.UUID
@@ -27,9 +26,16 @@ class OrderItem(OrderItemBase):
 
 # ---------------- ORDER ----------------
 class OrderBase(BaseModel):
-    user_id: uuid.UUID = None
+    user_id: Optional[uuid.UUID] = None
     payment_method: PaymentMethod
-    shipping_address: str
+
+    # Shipping info
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    address: str
+    city: str
+    postal_code: str
+    phone: str
 
 
 class OrderCreate(OrderBase):

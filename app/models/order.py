@@ -26,7 +26,15 @@ class Order(Base):
     status = Column(Enum(OrderStatus), default=OrderStatus.pending, nullable=False)
     payment_method = Column(Enum(PaymentMethod), nullable=False)
     total_amount = Column(DECIMAL(12, 2), nullable=False)
-    shipping_address = Column(Text, nullable=False)
+
+    # shipping info
+    first_name = Column(String(50), nullable=True)
+    last_name = Column(String(50), nullable=True)
+    address = Column(Text, nullable=False)
+    city = Column(String(50), nullable=False)
+    postal_code = Column(String(20), nullable=False)
+    phone = Column(String(20), nullable=False)
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")

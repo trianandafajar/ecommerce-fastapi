@@ -95,40 +95,19 @@ def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)
 # GET CURRENT USER
 @router.get(
     "/me",
-    response_model=SuccessResponse[dict],
+    response_model=SuccessResponse[User],
     responses={401: {"model": ErrorResponse}},
 )
-def me(request: Request, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
-    try:
-        user = get_current_user(token, db)
-        if not user:
-            return error_response(
-                message="Unauthorized",
-                code=401,
-                metadata={"request_id": getattr(request.state, "request_id", None)},
-            )
+def me(
+    request: Request,
+    user: UserModel = Depends(get_current_user),
+):
+    return success_response(
+        message="User info retrieved successfully",
+        data=User.model_validate(user),
+        metadata={"request_id": getattr(request.state, "request_id", None)},
+    )
 
-        payload = {
-            "code": 200,
-            "status": "success",
-            "message": "User info retrieved successfully",
-            "data": {
-                "id": str(user.id),
-                "name": user.name,
-                "email": user.email,
-                "phone": user.phone,
-            },
-            "metadata": {"request_id": getattr(request.state, "request_id", None)},
-        }
-        return jsonable_encoder(payload)
-
-    except Exception as e:
-        return error_response(
-            message="Failed to get user info",
-            code=500,
-            details=str(e),
-            metadata={"request_id": getattr(request.state, "request_id", None)},
-        )
         
 @router.post("/forgot-password")
 def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
