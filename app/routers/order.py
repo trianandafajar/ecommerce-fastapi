@@ -3,10 +3,13 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.utils.database import SessionLocal
-from app.models.order import Order as OrderModel, OrderItem as OrderItemModel
+from app.models import Order as OrderModel, OrderItem as OrderItemModel, User as UserModel
 from app.schemas.order import Order as OrderSchema, OrderCreate as OrderCreateSchema
 from app.schemas.response import SuccessResponse, ErrorResponse
 from app.utils.response import success_response, error_response
+from app.utils.email import send_email
+from app.utils.templates.checkout_email import build_checkout_email
+from app.utils.auth import get_current_user
 
 
 API_URL = "/orders"
@@ -28,12 +31,17 @@ def get_db():
     responses={400: {"model": ErrorResponse}},
     status_code=status.HTTP_201_CREATED,
 )
-def create_order(request: Request, order: OrderCreateSchema, db: Session = Depends(get_db)):
+def create_order(
+    request: Request, 
+    order: OrderCreateSchema, 
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
     try:
         total_amount = sum([item.price * item.quantity for item in order.items])
 
         db_order = OrderModel(
-            user_id=str(order.user_id) if order.user_id else None,
+            user_id=current_user.id,
             payment_method=order.payment_method,
             first_name=order.first_name,
             last_name=order.last_name,
@@ -58,6 +66,17 @@ def create_order(request: Request, order: OrderCreateSchema, db: Session = Depen
 
         db.commit()
         db.refresh(db_order)
+        
+        try:
+            html_body = build_checkout_email(db_order)
+            if current_user.email:
+                send_email(
+                    to_email=current_user.email,
+                    subject="Your Order Confirmation - React Market",
+                    html_body=html_body,
+                )
+        except Exception as mail_error:
+            print(f"[WARNING] Failed to send checkout email: {mail_error}")
 
         return success_response(
             data=OrderSchema.model_validate(db_order).model_dump(),

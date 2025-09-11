@@ -147,7 +147,7 @@ def read_cart_lookup(
 def create_cart(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),  # ⬅️ user harus login
+    current_user: User = Depends(get_current_user),
 ):
     """Create cart (only allowed for authenticated users)"""
     try:

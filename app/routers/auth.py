@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 from fastapi.encoders import jsonable_encoder
 from fastapi.security import OAuth2PasswordBearer
 
-
 from app.utils.database import SessionLocal
 from app.models import User as UserModel, OTP
 from app.schemas import User, UserCreate, ForgotPasswordRequest, ResetPasswordRequest, VerifyOTPRequest, LoginRequest
@@ -12,6 +11,8 @@ from app.utils.auth import hash_password, verify_password, create_access_token, 
 from app.schemas.response import SuccessResponse, ErrorResponse
 from app.utils.otp import generate_otp, send_otp_email
 from app.utils.response import success_response, error_response
+from app.utils.email import send_email
+from app.utils.templates.welcome_email import build_welcome_email
 
 import datetime
 
@@ -53,6 +54,16 @@ def register(request: Request, user: UserCreate, db: Session = Depends(get_db)):
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
+        
+        html_body = build_welcome_email(new_user.name)
+        try:
+            send_email(
+                to_email=new_user.email,
+                subject="🎉 Welcome to React Market!",
+                html_body=html_body,
+            )
+        except Exception as e:
+            print(f"Failed to send welcome email: {e}")
 
         payload = {
             "code": 201,
@@ -116,7 +127,7 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
         return error_response(message="Email not found", code=404)
 
     code = generate_otp(db, str(user.id))
-    send_otp_email(user.email, code)
+    send_otp_email(user.email, code, user.name)
 
     return success_response(message="OTP sent to email", data={})
 
