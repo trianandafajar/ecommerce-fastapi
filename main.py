@@ -33,17 +33,11 @@ app.include_router(api_router)
 def root():
     return {"message": "FastAPI E-COMMERCE started successfully 🚀"}
 
-origins = [
-    "http://localhost:5173",
-    "http://keysthetix.trianandafajar.com/"
-    "https://keysthetix.trianandafajar.com/"
-]
-
 # add middleware
 app.add_middleware(RequestIDMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"]
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
