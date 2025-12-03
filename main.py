@@ -34,7 +34,9 @@ def root():
     return {"message": "FastAPI E-COMMERCE started successfully 🚀"}
 
 origins = [
-    "http://localhost:5173"
+    "http://localhost:5173",
+    "http://keysthetix.trianandafajar.com/"
+    "https://keysthetix.trianandafajar.com/"
 ]
 
 # add middleware
