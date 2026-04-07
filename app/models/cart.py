@@ -1,3 +1,4 @@
+from datetime import datetime
 import uuid
 from sqlalchemy import Column, String, DateTime, ForeignKey, Integer
 from sqlalchemy.sql import func
@@ -10,8 +11,8 @@ class Cart(Base):
     
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
     user_id = Column(String(225), ForeignKey("users.id"), nullable=True, index=True)
-    session_token = Column(String(225), nullable=True, unique=True, index=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    session_token = Column(String(225), nullable=True, unique=True, index=True, default=lambda: str(uuid.uuid4()))
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), default=datetime.utcnow)
 
     user = relationship("User", back_populates="carts")
     items = relationship("CartItem", back_populates="cart", cascade="all, delete-orphan")

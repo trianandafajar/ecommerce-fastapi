@@ -163,7 +163,6 @@ def create_cart(
 
         db_cart = CartModel(
             user_id=str(current_user.id),
-            session_token=None,
         )
         db.add(db_cart)
         db.commit()

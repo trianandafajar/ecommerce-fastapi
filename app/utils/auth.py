@@ -1,6 +1,6 @@
 # app/utils/auth.py
-from datetime import datetime, timedelta
-from passlib.context import CryptContext
+from datetime import datetime, timedelta, timezone
+import bcrypt
 from jose import jwt, JWTError
 import os
 from typing import Optional, Dict, Any
@@ -18,8 +18,6 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 # debug flag (set AUTH_DEBUG=true in env to enable)
 AUTH_DEBUG = os.getenv("AUTH_DEBUG", "false").lower() in ("1", "true", "yes")
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # keep oauth2_scheme for docs (Swagger) but we will also accept token from cookie
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
@@ -38,11 +36,18 @@ def _truncate_token(token: str, head: int = 8, tail: int = 6) -> str:
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return bcrypt.checkpw(
+            plain_password.encode("utf-8"),
+            hashed_password.encode("utf-8"),
+        )
+    except ValueError:
+        # Invalid hash format should behave like a failed password check.
+        return False
 
 
 def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
@@ -53,8 +58,11 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     Returns encoded JWT string.
     """
     to_encode = data.copy()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     expire = now + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    
+    print("TOKEN IAT:", int(now.timestamp()))
+    print("TOKEN EXP:", int(expire.timestamp()))
 
     # include issued-at and expiry as numeric timestamps (standard)
     to_encode.update({"iat": int(now.timestamp()), "exp": int(expire.timestamp())})
@@ -69,7 +77,15 @@ def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
     Decode JWT token and return payload dict or None if invalid/expired.
     """
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM],
+            options={
+                "verify_exp": True
+            },
+            audience=None
+        )
         return payload
     except JWTError as e:
         _debug("JWT decode error:", repr(e))
@@ -127,12 +143,15 @@ def get_current_user_optional(
         return None
 
     _debug("Raw token (truncated):", _truncate_token(token))
+    print("SERVER UTC NOW:", datetime.now(timezone.utc).timestamp())
+
     payload = decode_access_token(token)
     _debug("Decoded payload:", payload)
     if not payload:
         _debug("Token decode returned no payload (invalid/expired)")
         return None
 
+    print("TOKEN EXP:", payload.get("exp"))
     user_id = payload.get("sub")
     if not user_id:
         _debug("Token payload missing 'sub' claim:", payload)

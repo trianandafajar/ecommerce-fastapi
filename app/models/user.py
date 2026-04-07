@@ -3,7 +3,7 @@ from sqlalchemy import Column, String, Text, DateTime
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.utils.database import Base
-
+from datetime import datetime
 
 class User(Base):
     __tablename__ = "users"
@@ -13,7 +13,7 @@ class User(Base):
     email = Column(String(225), nullable=False, unique=True, index=True)
     password = Column(Text, nullable=False)
     phone = Column(String(20), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     carts = relationship("Cart", back_populates="user")

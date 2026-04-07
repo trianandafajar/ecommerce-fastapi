@@ -1,3 +1,4 @@
+from datetime import datetime
 import uuid
 from sqlalchemy import Column, String, Text, DECIMAL, DateTime
 from sqlalchemy.sql import func
@@ -12,7 +13,7 @@ class Product(Base):
     description = Column(Text, nullable=True)
     price = Column(DECIMAL(12, 2), nullable=False)
     image_url = Column(String(255), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     order_items = relationship("OrderItem", back_populates="product")
