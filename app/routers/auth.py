@@ -6,6 +6,7 @@ from fastapi.security import OAuth2PasswordBearer
 
 from app.utils.database import SessionLocal
 from app.models import User as UserModel, OTP
+from app.models.user import UserRole
 from app.schemas import User, UserCreate, ForgotPasswordRequest, ResetPasswordRequest, VerifyOTPRequest, LoginRequest
 from app.utils.auth import hash_password, verify_password, create_access_token, get_current_user
 from app.schemas.response import SuccessResponse, ErrorResponse
@@ -50,6 +51,8 @@ def register(request: Request, user: UserCreate, db: Session = Depends(get_db)):
             email=user.email,
             phone=user.phone,
             password=hash_password(user.password),
+            role=UserRole.customer.value,
+            is_active=True,
         )
         db.add(new_user)
         db.commit()
@@ -86,20 +89,25 @@ def register(request: Request, user: UserCreate, db: Session = Depends(get_db)):
 @router.post("/login")
 def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(UserModel).filter(UserModel.email == payload.email).first()
-    if not user or not verify_password(payload.password, user.password):
+    if not user or not user.is_active or not verify_password(payload.password, user.password):
         return error_response(
             message="Invalid credentials",
             code=401,
             metadata={"request_id": getattr(request.state, "request_id", None)},
         )
 
-    token = create_access_token({"sub": str(user.id)})
+    token = create_access_token({"sub": str(user.id), "role": user.role})
 
     return {
         "code": 200,
         "status": "success",
         "message": "Login successful",
-        "data": {"access_token": token, "token_type": "bearer"},
+        "data": {
+            "access_token": token,
+            "token_type": "bearer",
+            "role": user.role,
+            "user": User.model_validate(user).model_dump(),
+        },
         "metadata": {"request_id": getattr(request.state, "request_id", None)},
     }
 

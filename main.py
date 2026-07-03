@@ -17,7 +17,7 @@ from app.utils.response import (
     make_request_id,
 )
 # import routers
-from app.routers import product, auth, cart, order
+from app.routers import product, auth, cart, order, admin
 
 app = FastAPI(title="E-Commerce API")
 
@@ -28,6 +28,7 @@ api_router.include_router(auth.router)
 api_router.include_router(product.router)
 api_router.include_router(cart.router)
 api_router.include_router(order.router)
+api_router.include_router(admin.router)
 app.include_router(api_router)
 
 # health

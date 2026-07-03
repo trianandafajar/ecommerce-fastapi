@@ -10,6 +10,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.models import User as UserModel
+from app.models.user import UserRole
 from app.utils.database import SessionLocal
 
 # config
@@ -60,9 +61,6 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     to_encode = data.copy()
     now = datetime.now(timezone.utc)
     expire = now + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    
-    print("TOKEN IAT:", int(now.timestamp()))
-    print("TOKEN EXP:", int(expire.timestamp()))
 
     # include issued-at and expiry as numeric timestamps (standard)
     to_encode.update({"iat": int(now.timestamp()), "exp": int(expire.timestamp())})
@@ -160,6 +158,9 @@ def get_current_user_optional(
     # user.id is a UUID string in your model; compare as string
     user = db.query(UserModel).filter(UserModel.id == str(user_id)).first()
     _debug("User lookup by sub:", str(user_id), "=>", "FOUND" if user else "NOT FOUND")
+    if user and not user.is_active:
+        _debug("User is inactive:", str(user_id))
+        return None
     return user
 
 
@@ -177,4 +178,31 @@ def get_current_user(
             detail="Unauthorized",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account disabled",
+        )
+    return user
+
+
+def require_role(*allowed_roles: UserRole):
+    allowed = {role.value if isinstance(role, UserRole) else str(role) for role in allowed_roles}
+
+    def _dependency(user: UserModel = Depends(get_current_user)) -> UserModel:
+        if user.role not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden",
+            )
+        return user
+
+    return _dependency
+
+
+def require_admin(user: UserModel = Depends(require_role(UserRole.admin))) -> UserModel:
+    return user
+
+
+def require_customer(user: UserModel = Depends(require_role(UserRole.customer))) -> UserModel:
     return user

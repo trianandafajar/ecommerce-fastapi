@@ -2,6 +2,7 @@ import uuid
 from pydantic import BaseModel, Field, EmailStr
 from datetime import datetime
 from typing import Optional
+from app.models.user import UserRole
 
 
 class UserBase(BaseModel):
@@ -21,8 +22,17 @@ class UserUpdate(BaseModel):
     password: Optional[str] = Field(None, min_length=6)
 
 
+class AdminUserUpdate(BaseModel):
+    name: Optional[str] = Field(None, max_length=255)
+    phone: Optional[str] = None
+    email: Optional[EmailStr] = None
+    is_active: Optional[bool] = None
+
+
 class User(UserBase):
     id: uuid.UUID
+    role: UserRole
+    is_active: bool
     created_at: datetime
     updated_at: Optional[datetime] = None
 
