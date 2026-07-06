@@ -1,5 +1,10 @@
 # app/routers/product.py
-from fastapi import APIRouter, Depends, Request, status
+import os
+import shutil
+from pathlib import Path
+from uuid import uuid4
+
+from fastapi import APIRouter, Depends, File, Request, UploadFile, status
 from sqlalchemy.orm import Session
 from typing import List
 from fastapi.encoders import jsonable_encoder
@@ -13,6 +18,8 @@ from app.utils.response import success_response, error_response
 
 API_URL = "/products"
 router = APIRouter(prefix=API_URL, tags=["Products"])
+UPLOAD_DIR = Path(__file__).resolve().parents[2] / "uploads" / "products"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def get_db():
@@ -36,6 +43,7 @@ def read_products(
     page: int = Query(1, ge=1),
     per_page: int = Query(10, ge=1, le=100),
     search: str | None = Query(None, description="Search by name or description"),
+    category: str | None = Query(None, description="Filter by category"),
     db: Session = Depends(get_db),
 ):
     try:
@@ -47,15 +55,21 @@ def read_products(
                 or_(
                     ProductModel.name.ilike(search_term),
                     ProductModel.description.ilike(search_term),
+                    ProductModel.category.ilike(search_term),
                 )
             )
+
+        if category:
+            query = query.filter(ProductModel.category == category)
+
+        query = query.order_by(ProductModel.created_at.desc())
 
         total = query.count()
         current_page = page
         offset = (page - 1) * per_page
 
         products = query.offset(offset).limit(per_page).all()
-        total_pages = (total + per_page - 1) // per_page
+        total_pages = max((total + per_page - 1) // per_page, 1) if total else 0
 
         return success_response(
             data=[Product.model_validate(p).model_dump() for p in products],
@@ -68,14 +82,98 @@ def read_products(
                     "total": total,
                     "total_pages": total_pages,
                     "has_next": current_page < total_pages,
+                    "has_prev": current_page > 1,
                 },
-                "filters": {"search": search},
+                "filters": {"search": search, "category": category},
             },
         )
     except Exception as e:
         return error_response(
             message="Failed to fetch products",
             code=500,
+            details=str(e),
+            metadata={"request_id": getattr(request.state, "request_id", None)},
+        )
+
+
+@router.get(
+    "/categories",
+    response_model=SuccessResponse[List[str]],
+    responses={500: {"model": ErrorResponse}},
+)
+def product_categories(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    try:
+        categories = (
+            db.query(ProductModel.category)
+            .filter(ProductModel.category.isnot(None))
+            .filter(ProductModel.category != "")
+            .distinct()
+            .order_by(ProductModel.category.asc())
+            .all()
+        )
+
+        return success_response(
+            data=[category[0] for category in categories],
+            message="Product categories fetched successfully",
+            metadata={"request_id": getattr(request.state, "request_id", None)},
+        )
+    except Exception as e:
+        return error_response(
+            message="Failed to fetch product categories",
+            code=500,
+            details=str(e),
+            metadata={"request_id": getattr(request.state, "request_id", None)},
+        )
+
+
+@router.post(
+    "/upload-image",
+    response_model=SuccessResponse[dict],
+    responses={400: {"model": ErrorResponse}},
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_product_image(
+    request: Request,
+    file: UploadFile = File(...),
+):
+    try:
+        content_type = file.content_type or ""
+        if not content_type.startswith("image/"):
+            return error_response(
+                message="Invalid image file",
+                code=400,
+                details="Only image files are allowed",
+                metadata={"request_id": getattr(request.state, "request_id", None)},
+            )
+
+        _, ext = os.path.splitext(file.filename or "")
+        safe_ext = ext if ext else ".jpg"
+        filename = f"{uuid4().hex}{safe_ext}"
+        save_path = UPLOAD_DIR / filename
+
+        with save_path.open("wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        request_base = str(request.base_url).rstrip("/")
+        public_url = f"{request_base}/uploads/products/{filename}"
+
+        return success_response(
+            data={
+                "url": public_url,
+                "filename": filename,
+                "content_type": content_type,
+            },
+            message="Image uploaded successfully",
+            code=201,
+            metadata={"request_id": getattr(request.state, "request_id", None)},
+        )
+    except Exception as e:
+        return error_response(
+            message="Failed to upload image",
+            code=400,
             details=str(e),
             metadata={"request_id": getattr(request.state, "request_id", None)},
         )
@@ -132,6 +230,7 @@ def create_product(request: Request, product: ProductCreate, db: Session = Depen
         db_product = ProductModel(
             name=product.name,
             description=product.description,
+            category=product.category,
             price=product.price,
             image_url=str(product.image_url),
         )

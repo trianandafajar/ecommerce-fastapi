@@ -57,6 +57,10 @@ class OrderCreate(OrderBase):
 class Order(OrderBase):
     id: uuid.UUID
     status: OrderStatus
+    payment_provider: Optional[str] = None
+    stripe_checkout_session_id: Optional[str] = None
+    stripe_payment_intent_id: Optional[str] = None
+    stripe_customer_id: Optional[str] = None
     total_amount: Decimal
     created_at: datetime
     updated_at: Optional[datetime] = None

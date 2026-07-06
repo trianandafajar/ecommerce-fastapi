@@ -1,1 +1,1 @@
-from app.routers import product, auth, cart, order, admin
+from app.routers import product, auth, cart, order, admin, customer, payment

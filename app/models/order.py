@@ -15,8 +15,8 @@ class OrderStatus(str, enum.Enum):
     cancelled = "cancelled"
     
 class PaymentMethod(str, enum.Enum):
-    cod = "cod"
-    bank_transfer = "bank_transfer"
+    delivery = "delivery"
+    stripe = "stripe"
     
 # schema
 class Order(Base):
@@ -26,6 +26,10 @@ class Order(Base):
     user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
     status = Column(Enum(OrderStatus), default=OrderStatus.pending, nullable=False)
     payment_method = Column(Enum(PaymentMethod), nullable=False)
+    payment_provider = Column(String(36), nullable=True)
+    stripe_checkout_session_id = Column(String(255), nullable=True, unique=True, index=True)
+    stripe_payment_intent_id = Column(String(255), nullable=True, index=True)
+    stripe_customer_id = Column(String(255), nullable=True, index=True)
     total_amount = Column(DECIMAL(12, 2), nullable=False)
 
     # shipping info

@@ -6,6 +6,7 @@ from typing import Optional
 class ProductBase(BaseModel):
     name: str = Field(..., max_length=255)
     description: Optional[str] = None
+    category: Optional[str] = None
     price: float
     image_url: Optional[str] = None
 
@@ -15,6 +16,7 @@ class ProductCreate(ProductBase):
 class ProductUpdate(ProductBase):
     name: Optional[str] = None
     description: Optional[str] = None
+    category: Optional[str] = None
     price: Optional[float] = None
     image_url: Optional[str] = None
 

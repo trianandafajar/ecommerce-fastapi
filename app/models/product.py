@@ -11,6 +11,7 @@ class Product(Base):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
     name = Column(String(225), nullable=False, index=True)
     description = Column(Text, nullable=True)
+    category = Column(String(120), nullable=True, index=True)
     price = Column(DECIMAL(12, 2), nullable=False)
     image_url = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), default=datetime.utcnow)

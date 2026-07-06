@@ -7,7 +7,7 @@ from fastapi.security import OAuth2PasswordBearer
 from app.utils.database import SessionLocal
 from app.models import User as UserModel, OTP
 from app.models.user import UserRole
-from app.schemas import User, UserCreate, ForgotPasswordRequest, ResetPasswordRequest, VerifyOTPRequest, LoginRequest
+from app.schemas import User, UserCreate, UserUpdate, ForgotPasswordRequest, ResetPasswordRequest, VerifyOTPRequest, LoginRequest
 from app.utils.auth import hash_password, verify_password, create_access_token, get_current_user
 from app.schemas.response import SuccessResponse, ErrorResponse
 from app.utils.otp import generate_otp, send_otp_email
@@ -124,6 +124,49 @@ def me(
     return success_response(
         message="User info retrieved successfully",
         data=User.model_validate(user),
+        metadata={"request_id": getattr(request.state, "request_id", None)},
+    )
+
+
+@router.put(
+    "/me",
+    response_model=SuccessResponse[User],
+    responses={400: {"model": ErrorResponse}, 401: {"model": ErrorResponse}},
+)
+def update_me(
+    request: Request,
+    payload: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    if payload.email:
+        existing = (
+            db.query(UserModel)
+            .filter(UserModel.email == payload.email, UserModel.id != current_user.id)
+            .first()
+        )
+        if existing:
+            return error_response(
+                message="Email already registered",
+                code=400,
+                metadata={"request_id": getattr(request.state, "request_id", None)},
+            )
+
+    if payload.name is not None:
+        current_user.name = payload.name
+    if payload.phone is not None:
+        current_user.phone = payload.phone
+    if payload.email is not None:
+        current_user.email = payload.email
+    if payload.password:
+        current_user.password = hash_password(payload.password)
+
+    db.commit()
+    db.refresh(current_user)
+
+    return success_response(
+        message="Profile updated successfully",
+        data=User.model_validate(current_user),
         metadata={"request_id": getattr(request.state, "request_id", None)},
     )
 

@@ -1,10 +1,12 @@
 # app/main.py
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 import logging
+from pathlib import Path
 from sqlalchemy import text
 
 load_dotenv()
@@ -17,9 +19,13 @@ from app.utils.response import (
     make_request_id,
 )
 # import routers
-from app.routers import product, auth, cart, order, admin
+from app.routers import product, auth, cart, order, admin, customer, payment
 
 app = FastAPI(title="E-Commerce API")
+
+UPLOAD_ROOT = Path(__file__).resolve().parent / "uploads"
+UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_ROOT)), name="uploads")
 
 # mount API router prefix /api/v1
 from fastapi import APIRouter
@@ -29,6 +35,8 @@ api_router.include_router(product.router)
 api_router.include_router(cart.router)
 api_router.include_router(order.router)
 api_router.include_router(admin.router)
+api_router.include_router(customer.router)
+api_router.include_router(payment.router)
 app.include_router(api_router)
 
 # health
